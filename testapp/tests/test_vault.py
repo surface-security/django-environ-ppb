@@ -26,7 +26,13 @@ class Test(TestCase):
 
     def test_vault_persistence(self):
         with tempfile.NamedTemporaryFile(delete=False) as tf:
-            environ = {'URL': 'https://vault.local', 'TOKEN': 'token123', 'AZ': 'notprd', 'MOUNT': '/tla_testsurf', 'CACHE': tf.name}
+            environ = {
+                'URL': 'https://vault.local',
+                'TOKEN': 'token123',
+                'AZ': 'notprd',
+                'MOUNT': '/tla_testsurf',
+                'CACHE': tf.name,
+            }
 
         self.env.ENVIRON = environ.copy()
         self.env.setup_vault('URL', 'TOKEN', 'MOUNT', 'AZ', persist_cache_var='CACHE')
