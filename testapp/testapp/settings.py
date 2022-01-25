@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'testapp',
 ]
 
 MIDDLEWARE = [
@@ -118,3 +119,22 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/3.1/howto/static-files/
 
 STATIC_URL = '/static/'
+
+import ppbenviron
+
+ENV_VAR = ppbenviron.CustomEnv()
+ENV_VAR.read_env(BASE_DIR / 'local.env')
+
+ENV_VAR.setup_vault(
+    'ENVTEST_VAULT_URL',
+    'ENVTEST_VAULT_TOKEN',
+    'ENVTEST_VAULT_MOUNT',
+    'ENVTEST_VAULT_PATHS',
+    default_url='http://vault.local',
+    default_token='tok3n',
+    default_mount='/secrets',
+    default_paths='staging,production',
+)
+
+TEST_SETTING_STR = ENV_VAR('ENVTEST_STR', default='missed')
+TEST_SETTING_LIST = ENV_VAR('ENVTEST_LIST', default=['missed'])
