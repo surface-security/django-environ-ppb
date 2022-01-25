@@ -18,7 +18,7 @@ class CustomEnv(environ.Env):
     vault_cache = None
     vault_token = None
     vault_mount = None
-    vault_zone = None
+    vault_paths = None
     cache_file = None
 
     def setup_vault(
@@ -26,22 +26,26 @@ class CustomEnv(environ.Env):
         url_var,
         token_var,
         mount_var,
-        zone_var,
+        paths_var,
         default_url=environ.Env.NOTSET,
         default_token=environ.Env.NOTSET,
         default_mount=environ.Env.NOTSET,
-        default_zone=environ.Env.NOTSET,
+        default_paths=environ.Env.NOTSET,
         persist_cache_var=environ.Env.NOTSET,
     ):
         self.vault_url = self.get_value(url_var, default=default_url)
         self.vault_token = self.get_value(token_var, default=default_token)
         self.vault_mount = self.get_value(mount_var, default=default_mount)
-        self.vault_zone = self.get_value(zone_var, default=default_zone)
-        self.cache_file = self.get_value(persist_cache_var, default=None)
+        self.vault_paths = self.list(paths_var, default=default_paths)
+        if persist_cache_var != environ.Env.NOTSET:
+            self.cache_file = self.get_value(persist_cache_var, default=None)
         if self.cache_file:
             try:
                 with open(self.cache_file) as f:
-                    self.vault_cache = json.load(f)
+                    data = f.read()
+                # no need to throw JSONDecodeError on empty file
+                if data.strip():
+                    self.vault_cache = json.loads(data)
             except FileNotFoundError:
                 # probably not cached yet, it is ok
                 pass
@@ -62,8 +66,14 @@ class CustomEnv(environ.Env):
                 value = super(CustomEnv, self).get_value(tvar)
                 if self.vault_cache is None:
                     client = hvac.Client(url=self.vault_url, token=self.vault_token)
-                    self.vault_cache = client.read('%s/common' % self.vault_mount)['data']
-                    self.vault_cache.update(client.read('%s/%s' % (self.vault_mount, self.vault_zone))['data'])
+                    self.vault_cache = {}
+                    for _p in self.vault_paths:
+                        _k = '%s/%s' % (self.vault_mount, _p)
+                        _v = client.read(_k)
+                        if _v is None:
+                            logger.error('Could not read %s from vault, ignoring', _k)
+                        else:
+                            self.vault_cache.update(_v['data'])
                     if self.cache_file is not None:
                         with open(self.cache_file, 'w') as f:
                             json.dump(self.vault_cache, f)
@@ -71,7 +81,7 @@ class CustomEnv(environ.Env):
                 if value in self.vault_cache:
                     return self.parse_value(self.vault_cache[value], cast)
                 else:
-                    logger.error(f"Could not find {value} in Vault cache, returning default")
+                    logger.error('Could not find %s in Vault cache, returning default', value)
 
         # even if var no in ENVIRON, call super to handle defaulting...
         return super(CustomEnv, self).get_value(var, cast, default, parse_default)

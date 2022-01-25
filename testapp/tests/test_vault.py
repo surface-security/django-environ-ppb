@@ -12,15 +12,20 @@ class Test(TestCase):
         self.env.ENVIRON = {}
 
     def test_vault(self):
-        self.env.ENVIRON = {'URL': 'https://vault.local', 'TOKEN': 'token123', 'AZ': 'notprd', 'MOUNT': '/tla_testsurf'}
-        self.env.setup_vault('URL', 'TOKEN', 'MOUNT', 'AZ')
+        self.env.ENVIRON = {
+            'URL': 'https://vault.local',
+            'TOKEN': 'token123',
+            'PATHS': 'common,notprd',
+            'MOUNT': '/testsurf',
+        }
+        self.env.setup_vault('URL', 'TOKEN', 'MOUNT', 'PATHS')
         self.env.ENVIRON['TEST_VAULT'] = 'secretkey'
         with mock.patch('hvac.Client') as mh:
             mh().read.return_value = {'data': {'secretkey': 'OK'}}
             mh.reset_mock()
             self.assertEqual(self.env('TEST'), 'OK')
             mh.assert_called_once_with(token='token123', url='https://vault.local')
-            mh().read.assert_has_calls((mock.call('/tla_testsurf/common'), mock.call('/tla_testsurf/notprd')))
+            mh().read.assert_has_calls((mock.call('/testsurf/common'), mock.call('/testsurf/notprd')))
 
         self.assertEqual(self.env.vault_cache, {'secretkey': 'OK'})
 
@@ -29,13 +34,13 @@ class Test(TestCase):
             environ = {
                 'URL': 'https://vault.local',
                 'TOKEN': 'token123',
-                'AZ': 'notprd',
-                'MOUNT': '/tla_testsurf',
+                'PATHS': 'common,notprd',
+                'MOUNT': '/testsurf',
                 'CACHE': tf.name,
             }
 
         self.env.ENVIRON = environ.copy()
-        self.env.setup_vault('URL', 'TOKEN', 'MOUNT', 'AZ', persist_cache_var='CACHE')
+        self.env.setup_vault('URL', 'TOKEN', 'MOUNT', 'PATHS', persist_cache_var='CACHE')
 
         self.assertIsNone(self.env.vault_cache)
 
@@ -51,5 +56,5 @@ class Test(TestCase):
         new_env = CustomEnv()
         new_env.ENVIRON = environ.copy()
         self.assertIsNone(new_env.vault_cache)
-        new_env.setup_vault('URL', 'TOKEN', 'MOUNT', 'AZ', persist_cache_var='CACHE')
+        new_env.setup_vault('URL', 'TOKEN', 'MOUNT', 'PATHS', persist_cache_var='CACHE')
         self.assertEqual(new_env.vault_cache, {'secretkey': 'OK'})
